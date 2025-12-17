@@ -5,14 +5,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { CustomerData } from '@/types/customer';
-import { formatCPF, formatPhone, formatCEP, validateCPF, validateEmail } from '@/lib/formatters';
+import { formatCPFCNPJ, formatPhone, formatCEP, validateCPFCNPJ, validateEmail, detectTipoPessoa } from '@/lib/formatters';
 import { User, Mail, Phone, Building2, MapPin, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface RegistrationFormProps {
   onSubmit: (data: CustomerData) => Promise<void>;
   isLoading: boolean;
+  destinatario: string;
+  valor: number;
 }
 
 const UF_OPTIONS = [
@@ -21,10 +24,11 @@ const UF_OPTIONS = [
   'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
-export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps) => {
+export const RegistrationForm = ({ onSubmit, isLoading, destinatario, valor }: RegistrationFormProps) => {
   const [formData, setFormData] = useState<CustomerData>({
     nome: '',
-    cpf: '',
+    cpfCnpj: '',
+    tipoPessoa: 'pf',
     email: '',
     whatsapp: '',
     companhia: '',
@@ -41,12 +45,16 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
 
   const handleChange = (field: keyof CustomerData, value: string) => {
     let formattedValue = value;
+    let updates: Partial<CustomerData> = {};
     
-    if (field === 'cpf') formattedValue = formatCPF(value);
+    if (field === 'cpfCnpj') {
+      formattedValue = formatCPFCNPJ(value);
+      updates.tipoPessoa = detectTipoPessoa(value);
+    }
     if (field === 'whatsapp') formattedValue = formatPhone(value);
     if (field === 'cep') formattedValue = formatCEP(value);
     
-    setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    setFormData(prev => ({ ...prev, [field]: formattedValue, ...updates }));
     setErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
@@ -54,15 +62,27 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
     const newErrors: Partial<Record<keyof CustomerData, string>> = {};
     
     if (!formData.nome.trim()) newErrors.nome = 'Nome é obrigatório';
-    if (!validateCPF(formData.cpf)) newErrors.cpf = 'CPF inválido';
+    else if (formData.nome.trim().length < 3) newErrors.nome = 'Nome deve ter pelo menos 3 caracteres';
+    
+    if (!validateCPFCNPJ(formData.cpfCnpj)) {
+      newErrors.cpfCnpj = formData.tipoPessoa === 'pj' ? 'CNPJ inválido' : 'CPF inválido';
+    }
+    
     if (!validateEmail(formData.email)) newErrors.email = 'E-mail inválido';
-    if (formData.whatsapp.replace(/\D/g, '').length < 10) newErrors.whatsapp = 'WhatsApp inválido';
+    
+    const phoneNumbers = formData.whatsapp.replace(/\D/g, '');
+    if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
+      newErrors.whatsapp = 'WhatsApp inválido';
+    }
+    
     if (!formData.rua.trim()) newErrors.rua = 'Rua é obrigatória';
     if (!formData.numero.trim()) newErrors.numero = 'Número é obrigatório';
     if (!formData.bairro.trim()) newErrors.bairro = 'Bairro é obrigatório';
     if (!formData.cidade.trim()) newErrors.cidade = 'Cidade é obrigatória';
     if (!formData.uf) newErrors.uf = 'UF é obrigatório';
-    if (formData.cep.replace(/\D/g, '').length !== 8) newErrors.cep = 'CEP inválido';
+    
+    const cepNumbers = formData.cep.replace(/\D/g, '');
+    if (cepNumbers.length !== 8) newErrors.cep = 'CEP inválido';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -79,11 +99,20 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
     await onSubmit(formData);
   };
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-glow animate-slide-up">
       <CardHeader className="text-center pb-2">
         <CardTitle className="text-2xl font-bold text-foreground">Cadastro</CardTitle>
         <CardDescription>Preencha seus dados para continuar</CardDescription>
+        <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
+          <p className="text-sm text-muted-foreground">Pagamento para:</p>
+          <p className="font-semibold text-foreground">{destinatario}</p>
+          <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(valor)}</p>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -103,20 +132,26 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                   onChange={e => handleChange('nome', e.target.value)}
                   placeholder="Seu nome completo"
                   className={errors.nome ? 'border-destructive' : ''}
+                  maxLength={100}
                 />
                 {errors.nome && <p className="text-xs text-destructive">{errors.nome}</p>}
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="cpf">CPF *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="cpfCnpj">CPF / CNPJ *</Label>
+                  <Badge variant={formData.tipoPessoa === 'pj' ? 'default' : 'secondary'} className="text-xs">
+                    {formData.tipoPessoa === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                  </Badge>
+                </div>
                 <Input
-                  id="cpf"
-                  value={formData.cpf}
-                  onChange={e => handleChange('cpf', e.target.value)}
-                  placeholder="000.000.000-00"
-                  className={errors.cpf ? 'border-destructive' : ''}
+                  id="cpfCnpj"
+                  value={formData.cpfCnpj}
+                  onChange={e => handleChange('cpfCnpj', e.target.value)}
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  className={errors.cpfCnpj ? 'border-destructive' : ''}
                 />
-                {errors.cpf && <p className="text-xs text-destructive">{errors.cpf}</p>}
+                {errors.cpfCnpj && <p className="text-xs text-destructive">{errors.cpfCnpj}</p>}
               </div>
             </div>
           </div>
@@ -138,6 +173,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                   onChange={e => handleChange('email', e.target.value)}
                   placeholder="seu@email.com"
                   className={errors.email ? 'border-destructive' : ''}
+                  maxLength={255}
                 />
                 {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
               </div>
@@ -173,6 +209,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                 value={formData.companhia}
                 onChange={e => handleChange('companhia', e.target.value)}
                 placeholder="Nome da empresa (opcional)"
+                maxLength={100}
               />
             </div>
           </div>
@@ -193,6 +230,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                   onChange={e => handleChange('rua', e.target.value)}
                   placeholder="Nome da rua"
                   className={errors.rua ? 'border-destructive' : ''}
+                  maxLength={200}
                 />
                 {errors.rua && <p className="text-xs text-destructive">{errors.rua}</p>}
               </div>
@@ -205,6 +243,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                   onChange={e => handleChange('numero', e.target.value)}
                   placeholder="Nº"
                   className={errors.numero ? 'border-destructive' : ''}
+                  maxLength={20}
                 />
                 {errors.numero && <p className="text-xs text-destructive">{errors.numero}</p>}
               </div>
@@ -219,6 +258,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                   onChange={e => handleChange('bairro', e.target.value)}
                   placeholder="Bairro"
                   className={errors.bairro ? 'border-destructive' : ''}
+                  maxLength={100}
                 />
                 {errors.bairro && <p className="text-xs text-destructive">{errors.bairro}</p>}
               </div>
@@ -245,6 +285,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                   onChange={e => handleChange('cidade', e.target.value)}
                   placeholder="Cidade"
                   className={errors.cidade ? 'border-destructive' : ''}
+                  maxLength={100}
                 />
                 {errors.cidade && <p className="text-xs text-destructive">{errors.cidade}</p>}
               </div>
@@ -281,6 +322,7 @@ export const RegistrationForm = ({ onSubmit, isLoading }: RegistrationFormProps)
                 onChange={e => handleChange('descricao', e.target.value)}
                 placeholder="Descreva o motivo do pagamento..."
                 rows={3}
+                maxLength={500}
               />
             </div>
           </div>

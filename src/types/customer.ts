@@ -1,6 +1,7 @@
 export interface CustomerData {
   nome: string;
-  cpf: string;
+  cpfCnpj: string;
+  tipoPessoa: 'pf' | 'pj';
   email: string;
   whatsapp: string;
   companhia: string;
@@ -31,4 +32,10 @@ export interface PaymentStatus {
   pixCode?: string;
   pixQrCode?: string;
   message?: string;
+}
+
+export interface ConfigData {
+  valor: number;
+  destinatario: string;
+  descricaoProduto?: string;
 }
