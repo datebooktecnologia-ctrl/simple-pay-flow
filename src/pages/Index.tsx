@@ -1,26 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { StepIndicator } from '@/components/StepIndicator';
 import { RegistrationForm } from '@/components/RegistrationForm';
 import { PaymentForm } from '@/components/PaymentForm';
 import { PaymentSuccess } from '@/components/PaymentSuccess';
-import { CustomerData, PaymentStatus } from '@/types/customer';
-import { cadastrarCliente, processarPagamento } from '@/lib/api';
+import { CustomerData, PaymentStatus, ConfigData } from '@/types/customer';
+import { cadastrarCliente, processarPagamento, obterConfiguracao } from '@/lib/api';
 import { toast } from 'sonner';
-import { Shield } from 'lucide-react';
+import { Shield, Loader2, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 const STEPS = ['Cadastro', 'Pagamento', 'Confirmação'];
-const VALOR_PAGAMENTO = 99.90; // Valor de exemplo
 
 const Index = () => {
+  const [searchParams] = useSearchParams();
+  const slug = searchParams.get('slug') || '';
+  
   const [currentStep, setCurrentStep] = useState(0);
   const [customerId, setCustomerId] = useState<string>('');
   const [transactionId, setTransactionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [config, setConfig] = useState<ConfigData | null>(null);
+
+  useEffect(() => {
+    const carregarConfiguracao = async () => {
+      setConfigLoading(true);
+      const data = await obterConfiguracao(slug);
+      setConfig(data);
+      setConfigLoading(false);
+    };
+    
+    carregarConfiguracao();
+  }, [slug]);
 
   const handleRegistration = async (data: CustomerData) => {
     setIsLoading(true);
     try {
-      const result = await cadastrarCliente(data);
+      const result = await cadastrarCliente({ ...data, slug });
       
       if (result.success && result.customerId) {
         setCustomerId(result.customerId);
@@ -60,6 +77,33 @@ const Index = () => {
     setTransactionId('');
   };
 
+  if (configLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="mt-4 text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+            <h2 className="mt-4 text-xl font-semibold text-foreground">Link inválido</h2>
+            <p className="mt-2 text-muted-foreground">
+              O link de pagamento não foi encontrado ou expirou.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -69,7 +113,7 @@ const Index = () => {
             <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
               <Shield className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">PaySimples</span>
+            <span className="text-xl font-bold text-foreground">M3A Pay</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Shield className="w-4 h-4 text-success" />
@@ -84,13 +128,18 @@ const Index = () => {
         
         <div className="mt-8">
           {currentStep === 0 && (
-            <RegistrationForm onSubmit={handleRegistration} isLoading={isLoading} />
+            <RegistrationForm 
+              onSubmit={handleRegistration} 
+              isLoading={isLoading}
+              destinatario={config.destinatario}
+              valor={config.valor}
+            />
           )}
           
           {currentStep === 1 && (
             <PaymentForm
               customerId={customerId}
-              valor={VALOR_PAGAMENTO}
+              valor={config.valor}
               onSubmit={handlePayment}
               onBack={() => setCurrentStep(0)}
               isLoading={isLoading}
@@ -100,7 +149,7 @@ const Index = () => {
           {currentStep === 2 && (
             <PaymentSuccess
               transactionId={transactionId}
-              valor={VALOR_PAGAMENTO}
+              valor={config.valor}
               onNewPayment={handleNewPayment}
             />
           )}
@@ -110,7 +159,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-border mt-auto py-6">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© 2024 PaySimples. Todos os direitos reservados.</p>
+          <p>© 2024 M3A Pay. Todos os direitos reservados.</p>
           <p className="mt-1">Pagamentos processados com segurança via Asaas</p>
         </div>
       </footer>

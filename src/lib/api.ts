@@ -1,9 +1,34 @@
-import { CustomerData, PaymentData, PaymentStatus } from '@/types/customer';
+import { CustomerData, PaymentData, PaymentStatus, ConfigData } from '@/types/customer';
 
 // Base URL para as APIs ASP - ajustar conforme ambiente
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
-export const cadastrarCliente = async (data: CustomerData): Promise<{ success: boolean; customerId?: string; message?: string }> => {
+export const obterConfiguracao = async (slug: string): Promise<ConfigData | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/land_cadastro.asp?slug=${encodeURIComponent(slug)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Erro ao obter configuração');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao obter configuração:', error);
+    // Simulação para desenvolvimento
+    return {
+      valor: 99.90,
+      destinatario: 'M3A Soluções Digitais',
+      descricaoProduto: 'Serviço Digital',
+    };
+  }
+};
+
+export const cadastrarCliente = async (data: CustomerData & { slug: string }): Promise<{ success: boolean; customerId?: string; message?: string }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/land_cadastro.asp`, {
       method: 'POST',
@@ -66,7 +91,7 @@ export const processarPagamento = async (data: PaymentData): Promise<PaymentStat
 
 export const verificarStatusPagamento = async (transactionId: string): Promise<PaymentStatus> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/land_pagamento_status.asp?transactionId=${transactionId}`, {
+    const response = await fetch(`${API_BASE_URL}/land_pagamento_status.asp?transactionId=${encodeURIComponent(transactionId)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
