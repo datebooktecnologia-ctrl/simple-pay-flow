@@ -18,6 +18,7 @@ const Index = () => {
   
   const [currentStep, setCurrentStep] = useState(0);
   const [customerId, setCustomerId] = useState<string>('');
+  const [asaasCustomerId, setAsaasCustomerId] = useState<string>('');
   const [transactionId, setTransactionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
@@ -41,6 +42,7 @@ const Index = () => {
       
       if (result.success && result.customerId) {
         setCustomerId(result.customerId);
+        setAsaasCustomerId(result.asaasCustomerId || '');
         setCurrentStep(1);
         toast.success('Cadastro realizado com sucesso!');
       } else {
@@ -139,6 +141,7 @@ const Index = () => {
           {currentStep === 1 && (
             <PaymentForm
               customerId={customerId}
+              asaasCustomerId={asaasCustomerId}
               valor={config.valor}
               onSubmit={handlePayment}
               onBack={() => setCurrentStep(0)}
