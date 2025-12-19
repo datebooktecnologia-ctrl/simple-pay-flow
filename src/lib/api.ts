@@ -1,7 +1,7 @@
 import { CustomerData, PaymentData, PaymentStatus, ConfigData } from '@/types/customer';
 
 // Base URL para as APIs ASP - ajustar conforme ambiente
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/pay/api';
 
 export const obterConfiguracao = async (slug: string): Promise<ConfigData | null> => {
   try {
