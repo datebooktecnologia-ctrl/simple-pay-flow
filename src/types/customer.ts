@@ -16,6 +16,7 @@ export interface CustomerData {
 
 export interface PaymentData {
   customerId: string;
+  asaasCustomerId?: string;
   valor: number;
   metodo: 'pix' | 'cartao';
   cartao?: {
@@ -29,6 +30,7 @@ export interface PaymentData {
 export interface PaymentStatus {
   status: 'pending' | 'confirmed' | 'failed';
   transactionId?: string;
+  asaasPaymentId?: string;
   pixCode?: string;
   pixQrCode?: string;
   message?: string;
@@ -38,4 +40,21 @@ export interface ConfigData {
   valor: number;
   destinatario: string;
   descricaoProduto?: string;
+  asaasApiKey?: string;
+  asaasBaseUrl?: string;
+}
+
+export interface AsaasPaymentResponse {
+  id: string;
+  customer: string;
+  value: number;
+  billingType: string;
+  status: string;
+  invoiceUrl?: string;
+  bankSlipUrl?: string;
+  pixQrCodeUrl?: string;
+  pixCopiaECola?: string;
+  encodedImage?: string;
+  payload?: string;
+  expirationDate?: string;
 }

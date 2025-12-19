@@ -11,13 +11,14 @@ import { toast } from 'sonner';
 
 interface PaymentFormProps {
   customerId: string;
+  asaasCustomerId: string;
   valor: number;
   onSubmit: (data: PaymentData) => Promise<PaymentStatus>;
   onBack: () => void;
   isLoading: boolean;
 }
 
-export const PaymentForm = ({ customerId, valor, onSubmit, onBack, isLoading }: PaymentFormProps) => {
+export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBack, isLoading }: PaymentFormProps) => {
   const [metodo, setMetodo] = useState<'pix' | 'cartao'>('pix');
   const [pixStatus, setPixStatus] = useState<PaymentStatus | null>(null);
   const [copied, setCopied] = useState(false);
@@ -44,6 +45,7 @@ export const PaymentForm = ({ customerId, valor, onSubmit, onBack, isLoading }: 
     try {
       const result = await onSubmit({
         customerId,
+        asaasCustomerId,
         valor,
         metodo: 'pix',
       });
@@ -89,6 +91,7 @@ export const PaymentForm = ({ customerId, valor, onSubmit, onBack, isLoading }: 
     
     const result = await onSubmit({
       customerId,
+      asaasCustomerId,
       valor,
       metodo: 'cartao',
       cartao: cardData,
