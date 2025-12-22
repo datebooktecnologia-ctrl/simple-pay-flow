@@ -1,8 +1,8 @@
 import { CustomerData, PaymentData, PaymentStatus, ConfigData } from '@/types/customer';
 
-// Base URL para as APIs ASP - URL absoluta para produção
-const API_BASE_URL = 'https://datebook.com.br/pay/api';
-
+// Base URL para as APIs ASP
+// Usa a BASE_URL do Vite (configurada como "/pay/") para funcionar em preview e produção.
+const API_BASE_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 // Cache da configuração para uso no pagamento
 let cachedConfig: ConfigData | null = null;
 let cachedSlug: string = '';
