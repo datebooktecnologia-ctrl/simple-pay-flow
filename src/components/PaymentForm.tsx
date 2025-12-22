@@ -163,8 +163,16 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
             ) : (
               <div className="space-y-4">
                 <div className="p-4 bg-secondary rounded-lg text-center">
-                  <div className="w-48 h-48 mx-auto bg-card border rounded-lg flex items-center justify-center mb-4">
-                    <QrCode className="w-32 h-32 text-foreground" />
+                  <div className="w-48 h-48 mx-auto bg-card border rounded-lg flex items-center justify-center mb-4 overflow-hidden">
+                    {pixStatus.pixQrCode ? (
+                      <img 
+                        src={pixStatus.pixQrCode} 
+                        alt="QR Code PIX" 
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <QrCode className="w-32 h-32 text-foreground" />
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
                     Escaneie o QR Code ou copie o código
