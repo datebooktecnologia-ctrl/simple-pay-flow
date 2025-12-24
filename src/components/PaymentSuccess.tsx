@@ -1,15 +1,39 @@
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 
 interface PaymentSuccessProps {
   transactionId: string;
   valor: number;
+  redirectUrl?: string;
   onNewPayment: () => void;
 }
 
-export const PaymentSuccess = ({ transactionId, valor, onNewPayment }: PaymentSuccessProps) => {
+export const PaymentSuccess = ({ transactionId, valor, redirectUrl, onNewPayment }: PaymentSuccessProps) => {
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    if (!redirectUrl) return;
+    
+    console.log('[PaymentSuccess] Iniciando countdown, redirectUrl:', redirectUrl);
+    
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          console.log('[PaymentSuccess] Redirecionando para:', redirectUrl);
+          window.location.href = redirectUrl;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [redirectUrl]);
+
   return (
     <Card className="w-full max-w-lg mx-auto shadow-glow animate-slide-up">
       <CardContent className="pt-12 pb-8 text-center">
@@ -35,10 +59,19 @@ export const PaymentSuccess = ({ transactionId, valor, onNewPayment }: PaymentSu
           <p className="text-sm font-mono text-foreground">{transactionId}</p>
         </div>
         
-        <Button onClick={onNewPayment} variant="outline" className="w-full">
-          Realizar Novo Pagamento
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        {redirectUrl ? (
+          <div className="flex flex-col items-center gap-2 py-4 bg-muted rounded-lg mb-4">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">
+              Você será redirecionado em <span className="font-bold text-primary">{countdown}</span> segundos...
+            </p>
+          </div>
+        ) : (
+          <Button onClick={onNewPayment} variant="outline" className="w-full">
+            Realizar Novo Pagamento
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PaymentData, PaymentStatus } from '@/types/customer';
 import { formatCardNumber, formatExpiry, formatCurrency } from '@/lib/formatters';
-import { CreditCard, QrCode, Copy, Check, Loader2, ArrowLeft, Shield } from 'lucide-react';
+import { verificarStatusPagamento, obterRedirectUrl } from '@/lib/api';
+import { CreditCard, QrCode, Copy, Check, Loader2, ArrowLeft, Shield, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaymentFormProps {
@@ -15,12 +16,14 @@ interface PaymentFormProps {
   valor: number;
   onSubmit: (data: PaymentData) => Promise<PaymentStatus>;
   onBack: () => void;
+  onPaymentConfirmed: (redirectUrl?: string) => void;
   isLoading: boolean;
 }
 
-export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBack, isLoading }: PaymentFormProps) => {
+export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBack, onPaymentConfirmed, isLoading }: PaymentFormProps) => {
   const [metodo, setMetodo] = useState<'pix' | 'cartao'>('pix');
   const [pixStatus, setPixStatus] = useState<PaymentStatus | null>(null);
+  const [pixConfirmed, setPixConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [cardData, setCardData] = useState({
     numero: '',
@@ -29,6 +32,79 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
     cvv: '',
   });
   const [processingPix, setProcessingPix] = useState(false);
+
+  // Refs para controle do polling
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPollingRef = useRef(false);
+
+  // Limpa polling ao desmontar componente
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, []);
+
+  const startPolling = (transactionId: string) => {
+    console.log('[Polling] Iniciando polling para transactionId:', transactionId);
+    isPollingRef.current = true;
+
+    // Polling a cada 3 segundos
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        console.log('[Polling] Verificando status...');
+        const result = await verificarStatusPagamento(transactionId);
+        console.log('[Polling] Status recebido:', result.status);
+
+        if (result.status === 'confirmed') {
+          console.log('[Polling] Pagamento confirmado!');
+          stopPolling();
+          setPixConfirmed(true);
+          
+          toast.success('✅ Pagamento confirmado!');
+
+          // Aguarda 2 segundos e redireciona
+          setTimeout(() => {
+            const redirectUrl = result.redirect || obterRedirectUrl();
+            console.log('[Polling] Redirecionando para:', redirectUrl);
+            onPaymentConfirmed(redirectUrl);
+          }, 2000);
+        } else if (result.status === 'failed') {
+          console.log('[Polling] Pagamento falhou');
+          stopPolling();
+          
+          toast.error('❌ Pagamento falhou. Tente novamente.');
+          setPixStatus(null);
+        }
+      } catch (error) {
+        console.error('[Polling] Erro ao verificar status:', error);
+      }
+    }, 3000);
+
+    // Timeout de segurança: 10 minutos
+    pollingTimeoutRef.current = setTimeout(() => {
+      console.log('[Polling] Timeout de 10 minutos atingido');
+      stopPolling();
+      
+      toast.error('⏱️ Tempo expirado. Gere um novo QR Code.');
+      setPixStatus(null);
+    }, 10 * 60 * 1000);
+  };
+
+  const stopPolling = () => {
+    console.log('[Polling] Parando polling...');
+    isPollingRef.current = false;
+    
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+  };
 
   const handleCardChange = (field: keyof typeof cardData, value: string) => {
     let formattedValue = value;
@@ -41,7 +117,10 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
   };
 
   const handlePixGenerate = async () => {
+    console.log('[PaymentForm] Gerando QR Code PIX...');
     setProcessingPix(true);
+    setPixConfirmed(false);
+    
     try {
       const result = await onSubmit({
         customerId,
@@ -49,11 +128,24 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
         valor,
         metodo: 'pix',
       });
+      
+      console.log('[PaymentForm] Resultado PIX:', result);
       setPixStatus(result);
-      if (result.status === 'pending') {
+      
+      if (result.status === 'pending' && result.transactionId) {
+        console.log('[PaymentForm] Status pending, iniciando polling...');
         toast.success('PIX gerado com sucesso!');
+        startPolling(result.transactionId);
+      } else if (result.status === 'confirmed') {
+        setPixConfirmed(true);
+        toast.success('✅ Pagamento já confirmado!');
+        setTimeout(() => {
+          const redirectUrl = result.redirect || obterRedirectUrl();
+          onPaymentConfirmed(redirectUrl);
+        }, 2000);
       }
-    } catch {
+    } catch (error) {
+      console.error('[PaymentForm] Erro ao gerar PIX:', error);
       toast.error('Erro ao gerar PIX');
     } finally {
       setProcessingPix(false);
@@ -98,7 +190,11 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
     });
     
     if (result.status === 'confirmed') {
-      toast.success('Pagamento aprovado!');
+      toast.success('✅ Pagamento aprovado!');
+      setTimeout(() => {
+        const redirectUrl = result.redirect || obterRedirectUrl();
+        onPaymentConfirmed(redirectUrl);
+      }, 2000);
     } else {
       toast.error(result.message || 'Pagamento não aprovado');
     }
@@ -160,6 +256,14 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
                   )}
                 </Button>
               </div>
+            ) : pixConfirmed ? (
+              <div className="space-y-4">
+                <div className="flex flex-col items-center justify-center py-8 text-green-600 bg-green-50 rounded-lg">
+                  <CheckCircle2 className="w-16 h-16 mb-3" />
+                  <span className="text-xl font-bold">✅ Pagamento confirmado!</span>
+                  <span className="text-sm text-muted-foreground mt-2">Você será redirecionado em alguns segundos...</span>
+                </div>
+              </div>
             ) : (
               <div className="space-y-4">
                 <div className="p-4 bg-secondary rounded-lg text-center">
@@ -181,7 +285,7 @@ export const PaymentForm = ({ customerId, asaasCustomerId, valor, onSubmit, onBa
                 
                 <div className="relative">
                   <Input
-                    value={pixStatus.pixCode?.slice(0, 40) + '...'}
+                    value={pixStatus.pixCode ? (pixStatus.pixCode.slice(0, 40) + '...') : ''}
                     readOnly
                     className="pr-12 font-mono text-xs"
                   />
