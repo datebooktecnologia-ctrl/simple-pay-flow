@@ -28,18 +28,20 @@ export interface PaymentData {
 }
 
 export interface PaymentStatus {
-  status: 'pending' | 'confirmed' | 'failed';
+  status: 'pending' | 'confirmed' | 'failed' | 'not_found';
   transactionId?: string;
   asaasPaymentId?: string;
   pixCode?: string;
   pixQrCode?: string;
   message?: string;
+  redirect?: string;
 }
 
 export interface ConfigData {
   valor: number;
   destinatario: string;
   descricaoProduto?: string;
+  redirect?: string;
   asaasApiKey?: string;
   asaasBaseUrl?: string;
 }

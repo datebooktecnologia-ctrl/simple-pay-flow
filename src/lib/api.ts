@@ -8,6 +8,7 @@ let cachedConfig: ConfigData | null = null;
 let cachedSlug: string = '';
 
 export const obterConfiguracao = async (slug: string): Promise<ConfigData | null> => {
+  console.log('[API] Obtendo configuração para slug:', slug);
   try {
     const response = await fetch(`${API_BASE_URL}/land_cadastro.asp?slug=${encodeURIComponent(slug)}`, {
       method: 'GET',
@@ -21,20 +22,28 @@ export const obterConfiguracao = async (slug: string): Promise<ConfigData | null
     }
     
     const data = await response.json();
+    console.log('[API] Configuração recebida:', data);
+    
     if (data.success) {
       cachedConfig = {
         valor: data.valor,
         destinatario: data.destinatario,
         descricaoProduto: data.descricaoProduto,
+        redirect: data.redirect,
       };
       cachedSlug = slug;
       return cachedConfig;
     }
     return null;
   } catch (error) {
-    console.error('Erro ao obter configuração:', error);
+    console.error('[API] Erro ao obter configuração:', error);
     return null;
   }
+};
+
+// Retorna a URL de redirecionamento cacheada
+export const obterRedirectUrl = (): string | undefined => {
+  return cachedConfig?.redirect;
 };
 
 export const cadastrarCliente = async (data: CustomerData & { slug: string }): Promise<{ success: boolean; customerId?: string; asaasCustomerId?: string; message?: string }> => {
@@ -127,6 +136,7 @@ export const processarPagamento = async (data: PaymentData): Promise<PaymentStat
 };
 
 export const verificarStatusPagamento = async (transactionId: string): Promise<PaymentStatus> => {
+  console.log('[API] Verificando status do pagamento:', transactionId);
   try {
     const response = await fetch(`${API_BASE_URL}/land_pagamento_status.asp?transactionId=${encodeURIComponent(transactionId)}`, {
       method: 'GET',
@@ -140,13 +150,16 @@ export const verificarStatusPagamento = async (transactionId: string): Promise<P
     }
     
     const data = await response.json();
+    console.log('[API] Status recebido:', data);
+    
     return {
-      status: data.status,
+      status: data.status || 'not_found',
       transactionId: data.transactionId || data.asaasPaymentId,
       message: data.message,
+      redirect: data.redirect || cachedConfig?.redirect,
     };
   } catch (error) {
-    console.error('Erro ao verificar status:', error);
+    console.error('[API] Erro ao verificar status:', error);
     return {
       status: 'pending',
       transactionId,

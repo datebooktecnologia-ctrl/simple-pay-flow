@@ -20,6 +20,7 @@ const Index = () => {
   const [customerId, setCustomerId] = useState<string>('');
   const [asaasCustomerId, setAsaasCustomerId] = useState<string>('');
   const [transactionId, setTransactionId] = useState<string>('');
+  const [redirectUrl, setRedirectUrl] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
   const [config, setConfig] = useState<ConfigData | null>(null);
@@ -27,7 +28,9 @@ const Index = () => {
   useEffect(() => {
     const carregarConfiguracao = async () => {
       setConfigLoading(true);
+      console.log('[Index] Carregando configuração para slug:', slug);
       const data = await obterConfiguracao(slug);
+      console.log('[Index] Configuração carregada:', data);
       setConfig(data);
       setConfigLoading(false);
     };
@@ -59,10 +62,12 @@ const Index = () => {
     setIsLoading(true);
     try {
       const result = await processarPagamento(data);
+      console.log('[Index] Resultado do pagamento:', result);
       
+      // Se confirmado imediatamente (cartão), vai para tela final
       if (result.status === 'confirmed') {
         setTransactionId(result.transactionId || '');
-        setCurrentStep(2);
+        // Não muda de step aqui, o PaymentForm vai chamar onPaymentConfirmed
       }
       
       return result;
@@ -73,10 +78,17 @@ const Index = () => {
     }
   };
 
+  const handlePaymentConfirmed = (url?: string) => {
+    console.log('[Index] Pagamento confirmado! Redirect URL:', url);
+    setRedirectUrl(url);
+    setCurrentStep(2);
+  };
+
   const handleNewPayment = () => {
     setCurrentStep(0);
     setCustomerId('');
     setTransactionId('');
+    setRedirectUrl(undefined);
   };
 
   if (configLoading) {
@@ -145,6 +157,7 @@ const Index = () => {
               valor={config.valor}
               onSubmit={handlePayment}
               onBack={() => setCurrentStep(0)}
+              onPaymentConfirmed={handlePaymentConfirmed}
               isLoading={isLoading}
             />
           )}
@@ -153,6 +166,7 @@ const Index = () => {
             <PaymentSuccess
               transactionId={transactionId}
               valor={config.valor}
+              redirectUrl={redirectUrl}
               onNewPayment={handleNewPayment}
             />
           )}
